@@ -1,0 +1,6 @@
+httpx>=0.28,<1
+python-dotenv>=1,<2
+psycopg[binary]>=3.2,<4
+dbt-core==1.9.*
+dbt-postgres==1.9.*
+pytest>=8,<10

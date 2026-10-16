@@ -1,0 +1,16 @@
+name: observatorio_criminal
+version: '1.0.0'
+config-version: 2
+profile: observatorio_criminal
+model-paths: ["models"]
+macro-paths: ["macros"]
+on-run-start:
+  - "{{ create_safe_timestamptz() }}"
+models:
+  observatorio_criminal:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: view
+    quality:
+      +materialized: view

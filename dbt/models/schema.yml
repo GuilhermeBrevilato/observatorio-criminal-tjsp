@@ -1,0 +1,25 @@
+version: 2
+models:
+  - name: stg_processos
+    description: "Metadados por documento, preservando identificador de origem e a data original."
+    columns:
+      - name: document_id
+        data_tests: [not_null, unique]
+  - name: fct_processos
+    description: "Registros da amostra com data e classe válidas; não deduplicados por número CNJ."
+    columns:
+      - name: document_id
+        data_tests: [not_null, unique]
+      - name: classe_codigo
+        data_tests: [not_null]
+      - name: data_ajuizamento
+        data_tests: [not_null]
+  - name: fct_assuntos
+    description: "Relação 1:N dos assuntos por documento."
+  - name: agg_ajuizamentos_mensais
+    description: "Contagem mensal APENAS da amostra extraída."
+  - name: qa_cobertura
+    description: "Cobertura e motivos de exclusão: total, incluídos e campos ausentes ou inválidos."
+    columns:
+      - name: indicador
+        data_tests: [not_null, unique]

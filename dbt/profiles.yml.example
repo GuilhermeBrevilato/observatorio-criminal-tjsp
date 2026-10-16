@@ -1,0 +1,12 @@
+observatorio_criminal:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      user: observatorio
+      password: observatorio
+      port: 5432
+      dbname: observatorio
+      schema: analytics
+      threads: 2
