@@ -3,7 +3,7 @@
 ## Conectar
 1. Execute `docker compose up -d`, o seed ou a carga real, e `dbt run`.
 2. No Power BI Desktop: **Obter dados > Banco de dados PostgreSQL**.
-3. Servidor: `localhost:5432`; banco: `observatorio`; autenticação: banco de dados (`observatorio` / `observatorio`).
+3. Servidor: `localhost:5433`; banco: `observatorio`; autenticação: banco de dados (`observatorio` / `observatorio`).
 4. Importe `analytics.fct_processos` e `analytics.agg_ajuizamentos_mensais`, `analytics.qa_cobertura` e opcionalmente `analytics.fct_assuntos`.
 5. Consulte a configuração do driver Npgsql caso solicitado pelo Power BI.
 

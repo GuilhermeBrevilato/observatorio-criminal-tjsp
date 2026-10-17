@@ -11,20 +11,26 @@ DEFAULT_URL = "https://api-publica.datajud.cnj.jus.br/api_publica_tjsp/_search"
 
 
 class DataJudClient:
-    def __init__(self, api_key: str, url: str | None = None, timeout: float = 40.0):
+    def __init__(self, api_key: str, url: str | None = None, timeout: float = 120.0):
         if not api_key:
             raise ValueError("DATAJUD_API_KEY ausente")
         self.url = url or os.getenv("DATAJUD_URL", DEFAULT_URL)
         self.headers = {"Authorization": f"APIKey {api_key}", "Content-Type": "application/json"}
         self.timeout = timeout
 
-    async def search(self, payload: dict[str, Any], retries: int = 3) -> dict[str, Any]:
+    async def search(self, payload: dict[str, Any], retries: int = 6) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             for attempt in range(retries + 1):
                 try:
                     response = await client.post(self.url, headers=self.headers, json=payload)
                     if response.status_code in (429, 500, 502, 503, 504) and attempt < retries:
-                        delay = min(8.0, 0.8 * (2 ** attempt)) + random.uniform(0, 0.2)
+                        if response.status_code == 429:
+                            # limite de taxa: respeita o tempo pedido pelo servidor
+                            delay = float(response.headers.get("Retry-After", 30 * (attempt + 1)))
+                        else:
+                            # servidor sobrecarregado: insistir rápido só piora (e gera 429).
+                            # Espera crescente: 10, 20, 40, 80, 120, 120 s
+                            delay = min(120.0, 10 * (2 ** attempt)) + random.uniform(0, 2)
                         logger.warning("HTTP %s; nova tentativa em %.1fs", response.status_code, delay)
                         await asyncio.sleep(delay)
                         continue
@@ -38,7 +44,7 @@ class DataJudClient:
                 except (httpx.TimeoutException, httpx.TransportError) as exc:
                     if attempt >= retries:
                         raise
-                    delay = min(8.0, 0.8 * (2 ** attempt)) + random.uniform(0, 0.2)
+                    delay = min(120.0, 10 * (2 ** attempt)) + random.uniform(0, 2)
                     logger.warning("Falha de rede %s; nova tentativa em %.1fs", type(exc).__name__, delay)
                     await asyncio.sleep(delay)
         raise RuntimeError("Consulta não concluída")

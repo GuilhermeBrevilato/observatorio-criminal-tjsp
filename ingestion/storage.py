@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS raw.ingestion_run (
     status TEXT NOT NULL DEFAULT 'running',
     details TEXT
 );
+ALTER TABLE raw.ingestion_run ADD COLUMN IF NOT EXISTS error TEXT;
 """
 
 
@@ -37,14 +38,13 @@ def start_run(conn, details: str) -> int:
 
 
 def finish_run(conn, run_id: int, fetched_count: int, status: str, error: str | None = None) -> None:
-    """Fecha o registro de execução com contagem, status e, se houver, a mensagem de erro."""
+    """Fecha o registro de execução com contagem, status e, se houver, a mensagem de erro.
+    `details` guarda só os parâmetros (JSON); o erro vai na coluna própria."""
     conn.execute(
         """UPDATE raw.ingestion_run
-              SET finished_at = now(), fetched_count = %s, status = %s,
-                  details = CASE WHEN %s::text IS NULL THEN details
-                                 ELSE details || ' | erro: ' || %s::text END
+              SET finished_at = now(), fetched_count = %s, status = %s, error = %s
             WHERE run_id = %s""",
-        (fetched_count, status, error, error, run_id),
+        (fetched_count, status, error, run_id),
     )
     conn.commit()
 

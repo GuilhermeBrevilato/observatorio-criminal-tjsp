@@ -43,14 +43,18 @@ Classes validadas em amostra real do TJSP (TPU/CNJ):
 | 283 | Ação Penal - Procedimento Ordinário | 867.669 |
 
 ```bash
-python -m ingestion.run --class-codes 280 --start-date 2024-01-01 --end-date 2026-01-01 --max-records 50000 --page-size 1000
+python -m ingestion.run --class-codes 280 --start-date 2024-01-01 --end-date 2026-01-01
 ```
-Em seguida, execute `dbt run` e `dbt test` novamente. A ação penal (283) excede o limite de 50.000 por execução: recorte por período menor.
+A carga é feita **mês a mês**. Se a API falhar, rode o mesmo comando de novo: meses já carregados com sucesso são pulados (`--force` recarrega). O limite `--max-records` vale por mês.
 
-Cada execução fica registrada em `raw.ingestion_run` (parâmetros, quantidade, `success`/`failed` e mensagem de erro).
+Em seguida, execute `dbt run` e `dbt test` novamente.
+
+Cada mês carregado fica registrado em `raw.ingestion_run` (parâmetros em JSON, quantidade, `success`/`failed` e, se houver, a mensagem na coluna `error`).
 
 ## Decisões técnicas
 - **Paginação segura contra empates** (`ingestion/paginacao.py`): o `search_after` por `@timestamp` pula documentos quando vários têm o mesmo timestamp e a página termina no meio do grupo. A próxima página recomeça 1 ms antes do último timestamp e descarta `_id` já vistos. Se uma página inteira estiver empatada, a carga para com erro pedindo `--page-size` maior, em vez de perder dados em silêncio. Coberto por `tests/test_paginacao.py`.
+- **Resiliência a uma API instável**: o DataJud alterna 504 (servidor sobrecarregado) e 429 (limite de taxa). Tentar de novo em 1–2 s piorava o quadro e provocava o 429. O cliente espera 10, 20, 40, 80 e 120 s em erros 5xx, respeita o `Retry-After` no 429 e usa timeout de 120 s. Coberto por `tests/test_run.py`.
+- **Carga mensal retomável** (`ingestion/run.py`): consultas menores falham menos, e uma falha só obriga a refazer o mês em andamento.
 - **Datas tolerantes a formato** (`dbt/macros/safe_timestamptz.sql`): aceita ISO 8601 e o formato compacto `AAAAMMDDhhmmss`; valor inválido vira NULL em vez de derrubar todos os modelos. A data original é preservada em `data_ajuizamento_original`.
 - **Nada some sem registro**: `qa_cobertura` mostra o total da origem, quantos chegam ao `fct_processos` e quantos ficam de fora por data ausente/inválida, classe, órgão ou município ausentes.
 

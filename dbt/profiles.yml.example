@@ -6,7 +6,7 @@ observatorio_criminal:
       host: localhost
       user: observatorio
       password: observatorio
-      port: 5432
+      port: 5433
       dbname: observatorio
       schema: analytics
       threads: 2
