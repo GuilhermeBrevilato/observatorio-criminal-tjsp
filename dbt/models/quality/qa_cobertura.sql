@@ -7,8 +7,8 @@ WITH base AS (
                         OR data_ajuizamento_original = '')          AS sem_data,
     count(*) FILTER (WHERE data_ajuizamento_original <> ''
                        AND data_ajuizamento IS NULL)                AS data_invalida,
-    count(*) FILTER (WHERE data_ajuizamento < DATE '1990-01-01'
-                        OR data_ajuizamento > now() + INTERVAL '1 day') AS data_implausivel,
+    count(*) FILTER (WHERE data_ajuizamento > now() + INTERVAL '1 day') AS data_futura,
+    count(*) FILTER (WHERE data_ajuizamento < DATE '1990-01-01')     AS data_anterior_1990,
     count(*) FILTER (WHERE data_ajuizamento_original ~ '^\d{14}$')  AS data_formato_compacto,
     count(*) FILTER (WHERE classe_codigo IS NULL)                   AS sem_classe,
     count(*) FILTER (WHERE municipio_ibge IS NULL)                  AS sem_municipio_ibge,
@@ -26,7 +26,8 @@ CROSS JOIN LATERAL (VALUES
   ('incluidos_fct',      incluidos_fct),
   ('sem_data',           sem_data),
   ('data_invalida',      data_invalida),
-  ('data_implausivel',   data_implausivel),
+  ('data_futura',        data_futura),
+  ('data_anterior_1990', data_anterior_1990),
   ('data_formato_compacto', data_formato_compacto),
   ('fora_da_ultima_carga', fora_da_ultima_carga),
   ('sem_classe',         sem_classe),
