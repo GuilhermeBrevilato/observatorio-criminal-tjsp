@@ -6,9 +6,9 @@ só medidas de soma e divisão. Os números são testados no dbt antes de chegar
 
 ## 1. Conectar (Power BI no Parallels, banco no Docker do Mac)
 1. No Mac: `docker compose up -d`, depois `dbt seed`, `dbt run` e `dbt test` **sem erro** (com erro, não atualize o painel).
-2. No Windows, confirme o endereço do Mac: `Test-NetConnection 10.211.55.2 -Port 5433` (deve dar `TcpTestSucceeded : True`; o Gateway do `ipconfig`, `10.211.55.1`, é o roteador do Parallels e não chega ao banco).
+2. No Windows, descubra o endereço do Mac: `ipconfig | findstr "Gateway"` (padrão do Parallels: `10.211.55.1`).
 3. Power BI → **Obter dados → Banco de dados PostgreSQL**
-   - Servidor: `10.211.55.2:5433` · Banco: `observatorio` · Modo: **Importar**
+   - Servidor: `10.211.55.1:5433` · Banco: `observatorio` · Modo: **Importar**
    - Credenciais (aba *Banco de dados*): `observatorio` / `observatorio`
 4. Importe do esquema `analytics`:
    `rpt_desfecho_mensal`, `rpt_tempo_faixas`, `rpt_desfecho_orgao`, `fct_desfecho_flagrante`, `qa_cobertura`, `qa_desfecho`.
@@ -44,7 +44,10 @@ servem só para conferência linha a linha.
 ### Página 1 · Visão geral
 - **Cartões:** `Flagrantes` · `Com desfecho` · `% identificável` · `Mediana horas`
 - **Gráfico de linhas:** eixo `rpt_desfecho_mensal[mes_ajuizamento]`, valor `flagrantes`
-- **Filtro da página:** `mes_ajuizamento` a partir de **2024-01-01**
+- **Filtros da página (os dois):** `rpt_desfecho_mensal[mes_ajuizamento]` **e**
+  `fct_desfecho_flagrante[mes_ajuizamento]`, ambos a partir de **2024-01-01**.
+  As tabelas não têm relacionamento: o filtro numa não chega à outra. Sem o segundo filtro,
+  o cartão `Mediana horas` mostraria todos os anos ao lado de cartões só de 2024 em diante.
 - **Caixa de texto:** "Autos de prisão em flagrante do TJSP na classe atual 280 (DataJud/CNJ).
   Processos que mudaram de classe não aparecem; anos anteriores tendem a ter menos registros."
 

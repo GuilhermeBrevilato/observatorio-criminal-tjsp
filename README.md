@@ -80,6 +80,29 @@ Números contaminados pelo defeito (não usar): uma contagem "desde 2024-01-01" 
 
 Decisão: **nenhum filtro de data na fonte.** A extração usa só a classe, e o dbt interpreta a data a partir do texto original (`safe_timestamptz`). O teste `assert_datas_nao_futuras` **falha** (bloqueia) com qualquer data no futuro; `assert_datas_antigas` só avisa sobre datas anteriores a 1990 (a carga real trouxe 92 flagrantes de 1899 a 1989, lidos de forma consistente nos dois formatos), e a `qa_cobertura` mostra quantos registros vieram em formato compacto.
 
+## Achado: a série mensal não mede o volume de flagrantes
+O gráfico de flagrantes por mês funciona e os números estão certos: são os processos que **hoje** estão na classe 280. Mas, ao conferir a série, ela mostrou três sinais de que não serve para medir quantos flagrantes houve em cada mês.
+
+| Mês | Flagrantes | Formato compacto | Órgãos com registro |
+|---|---|---|---|
+| out/2024 | 489 | 274 | 259 |
+| jan/2025 | 791 | 303 | 335 |
+| **fev/2025** | **282** | **282 (100%)** | **169** |
+| jun/2026 | 529 | 529 | 122 |
+| jul/2026 | 794 | 794 | 146 |
+| **ago/2026** | **1.940** | 1.940 | 178 |
+| **set/2026** | **335** | 335 | **19** |
+
+1. **Quebra em fev/2025.** De um mês para o outro, a data passa a vir 100% no formato compacto, o número de órgãos cai pela metade e o volume cai. Isso indica uma mudança na forma de envio dos dados, não uma queda nas prisões. A causa exata não foi verificada.
+2. **Meses recentes incompletos.** Set/2026 tem registro de só 19 órgãos (contra mais de 100 nos outros meses), e out/2026 ainda não aparece. Os dados chegam ao DataJud com atraso.
+3. **Meses recentes inflados.** Ago/2026 tem 1.940 flagrantes, perto de 4 vezes a média, espalhados por 178 órgãos e por todo o mês; só de 25 a 31/08 são 819. Não é um lote único de um órgão.
+
+**Hipótese (não comprovada):** o auto de prisão em flagrante é um processo de passagem e sai da classe 280 com o tempo (conversão, arquivamento, mudança de classe; 928 processos da carga têm o movimento "Mudança de Classe Processual"). Como o DataJud mostra a classe atual, os meses antigos "encolhem" e os recentes ficam inflados até o processo seguir seu curso.
+
+**Teste previsto:** a contagem por mês de 19/10/2026 foi guardada fora do repositório. Uma nova carga, semanas depois, confirma a hipótese se ago/2026 diminuir.
+
+**No painel:** a linha é mantida, com a quebra de fev/2025 marcada e o aviso de que ela mostra os processos que estão hoje na classe, não o volume de prisões no tempo.
+
 ## Desfecho do flagrante
 `fct_desfecho_flagrante`: uma linha por auto de prisão em flagrante, com a **primeira decisão sobre a prisão** (o que aconteceu logo depois do flagrante) e o tempo até ela.
 
