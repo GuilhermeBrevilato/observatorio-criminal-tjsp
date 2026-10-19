@@ -1,5 +1,5 @@
 import pytest
-from ingestion.client import build_query
+from ingestion.client import build_count_query, build_query
 from ingestion.demo_seed import demo_hits
 
 
@@ -10,9 +10,16 @@ def test_query_default():
 
 
 def test_query_filtered():
-    q = build_query(20, [123, 456], "2025-01-01", "2026-01-01", [42])
-    assert q["query"]["bool"]["filter"][0] == {"terms": {"classe.codigo": [123, 456]}}
+    q = build_query(20, [123, 456], [42])
+    assert q["query"]["bool"]["filter"] == [{"terms": {"classe.codigo": [123, 456]}}]
     assert q["search_after"] == [42]
+
+
+def test_nenhum_filtro_de_data_na_fonte():
+    """Regressão: a data do DataJud não é confiável para filtrar (ver README)."""
+    import json
+    assert "dataAjuizamento" not in json.dumps(build_query(10, [280]))
+    assert "dataAjuizamento" not in json.dumps(build_count_query([280]))
 
 
 def test_invalid_page_size():

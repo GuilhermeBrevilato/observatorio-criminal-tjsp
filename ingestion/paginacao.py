@@ -28,14 +28,19 @@ def _cursor_inclusivo(sort_value: list) -> list:
 
 
 async def paginar(buscar: Callable[[list | None, int], Any],
-                  page_size: int, max_records: int) -> AsyncIterator[list[dict]]:
+                  page_size: int, max_records: int,
+                  cursor_inicial: list | None = None) -> AsyncIterator[list[dict]]:
     """Gera lotes de hits INÉDITOS (por _id) até esgotar ou atingir max_records.
 
     `buscar(cursor, size)` deve executar a consulta e devolver a resposta do
     Elasticsearch. O cursor é None na primeira página.
+
+    `cursor_inicial` (o `sort` do último documento gravado numa execução
+    anterior) retoma a carga: a primeira página recomeça 1 ms antes dele, para
+    reincluir um eventual grupo empatado; repetidos são regravados sem duplicar.
     """
     vistos: set[str] = set()
-    cursor: list | None = None
+    cursor: list | None = _cursor_inclusivo(cursor_inicial) if cursor_inicial else None
     entregues = 0
 
     while entregues < max_records:

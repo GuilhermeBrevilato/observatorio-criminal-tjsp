@@ -4,6 +4,7 @@ config-version: 2
 profile: observatorio_criminal
 model-paths: ["models"]
 macro-paths: ["macros"]
+test-paths: ["tests"]
 on-run-start:
   - "{{ create_safe_timestamptz() }}"
 models:

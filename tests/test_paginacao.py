@@ -59,3 +59,18 @@ def test_pagina_maior_que_o_grupo_atravessa_o_empate():
     buscar, _ = fake_es(docs_com_empates(300, 200))
     ids = coletar(buscar, 250)
     assert len(set(ids)) == 300
+
+
+def test_retomada_pelo_cursor_nao_perde_o_grupo_empatado():
+    docs = docs_com_empates(250, 10)
+    buscar, _ = fake_es(docs)
+
+    async def _run():
+        ids = []
+        # simula: execução anterior gravou até o documento 104 (meio de um grupo empatado)
+        async for lote in paginar(buscar, 50, 10_000, cursor_inicial=docs[104]["sort"]):
+            ids.extend(h["_id"] for h in lote)
+        return ids
+    ids = asyncio.run(_run())
+    assert ids[0] == "D0100" and ids[-1] == "D0249"      # reinclui o grupo de 100 a 109
+    assert set(ids) == {d["_id"] for d in docs[100:]}

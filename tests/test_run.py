@@ -5,22 +5,11 @@ import pytest
 
 import ingestion.client as client_mod
 from ingestion.client import DataJudClient
-from ingestion.run import janelas_mensais
+from ingestion.run import job_key
 
 
-def test_janelas_mensais():
-    assert janelas_mensais("2024-11-01", "2025-02-01") == [
-        ("2024-11-01", "2024-12-01"), ("2024-12-01", "2025-01-01"), ("2025-01-01", "2025-02-01")]
-
-
-def test_janela_parcial_no_fim():
-    assert janelas_mensais("2024-01-15", "2024-02-10") == [
-        ("2024-01-15", "2024-02-01"), ("2024-02-01", "2024-02-10")]
-
-
-def test_janela_invalida():
-    with pytest.raises(ValueError):
-        janelas_mensais("2025-01-01", "2024-01-01")
+def test_job_key_independe_da_ordem():
+    assert job_key([283, 280]) == job_key([280, 283])
 
 
 def _cliente_com_respostas(monkeypatch, codigos):
@@ -59,3 +48,19 @@ def test_desiste_depois_das_tentativas(monkeypatch):
     with pytest.raises(httpx.HTTPStatusError):
         asyncio.run(cli.search({"size": 1}))
     assert len(esperas) == 6
+
+
+def test_resposta_parcial_de_shard_e_repetida(monkeypatch):
+    respostas = [{"timed_out": False, "_shards": {"failed": 1}, "hits": {"hits": []}},
+                 {"timed_out": False, "_shards": {"failed": 0}, "hits": {"hits": [{"_id": "ok"}]}}]
+    esperas = []
+    original = httpx.AsyncClient
+    monkeypatch.setattr(client_mod.httpx, "AsyncClient",
+                        lambda **kw: original(transport=httpx.MockTransport(
+                            lambda req: httpx.Response(200, json=respostas.pop(0))), **kw))
+
+    async def fake_sleep(s):
+        esperas.append(s)
+    monkeypatch.setattr(client_mod.asyncio, "sleep", fake_sleep)
+    resultado = asyncio.run(DataJudClient("x").search({"size": 1}))
+    assert resultado["hits"]["hits"] == [{"_id": "ok"}] and len(esperas) == 1

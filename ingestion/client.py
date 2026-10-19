@@ -37,7 +37,14 @@ class DataJudClient:
                     response.raise_for_status()
                     result = response.json()
                     if result.get("timed_out") or result.get("_shards", {}).get("failed", 0):
-                        raise RuntimeError("Consulta incompleta: timeout ou falha de shard")
+                        # HTTP 200, mas o Elasticsearch não consultou todas as partes do índice:
+                        # a página viria INCOMPLETA. Nunca aceitar; tentar de novo como num 5xx.
+                        if attempt >= retries:
+                            raise RuntimeError("Consulta incompleta: timeout ou falha de shard")
+                        delay = min(120.0, 10 * (2 ** attempt)) + random.uniform(0, 2)
+                        logger.warning("Resposta parcial (shard/timeout); nova tentativa em %.1fs", delay)
+                        await asyncio.sleep(delay)
+                        continue
                     if not isinstance(result.get("hits", {}).get("hits"), list):
                         raise ValueError("Formato de resposta inesperado")
                     return result
@@ -50,21 +57,23 @@ class DataJudClient:
         raise RuntimeError("Consulta não concluída")
 
 
+# Por que NÃO há filtro de data aqui (ver README, "Achado: datas do DataJud"):
+# o DataJud indexa `dataAjuizamento` de forma inconsistente. Quando o tribunal
+# envia o formato compacto ('20250218171119'), o índice lê o número como
+# milissegundos desde 1970 e grava a data 2611-09-15. Qualquer filtro de período
+# na fonte depende desse defeito. A extração filtra só pela classe (padrão
+# nacional da TPU/CNJ) e o período é recortado no dbt, a partir do texto original.
+
+
+def _filtros(class_codes) -> list:
+    return [{"terms": {"classe.codigo": class_codes}}] if class_codes else []
+
+
 def build_query(size: int = 10, class_codes: list[int] | None = None,
-                start_date: str | None = None, end_date: str | None = None,
                 after: list | None = None) -> dict:
     if not 1 <= size <= 1000:
         raise ValueError("Tamanho permitido neste projeto: 1 a 1000")
-    filters = []
-    if class_codes:
-        filters.append({"terms": {"classe.codigo": class_codes}})
-    if start_date or end_date:
-        conditions = {}
-        if start_date:
-            conditions["gte"] = start_date
-        if end_date:
-            conditions["lt"] = end_date
-        filters.append({"range": {"dataAjuizamento": conditions}})
+    filters = _filtros(class_codes)
     payload = {
         "size": size,
         "query": {"bool": {"filter": filters}} if filters else {"match_all": {}},
@@ -73,3 +82,9 @@ def build_query(size: int = 10, class_codes: list[int] | None = None,
     if after is not None:
         payload["search_after"] = after
     return payload
+
+
+def build_count_query(class_codes: list[int]) -> dict:
+    """Só a contagem exata, sem documentos: usada na conferência da carga."""
+    return {"size": 0, "track_total_hits": True,
+            "query": {"bool": {"filter": _filtros(class_codes)}}}

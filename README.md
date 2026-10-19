@@ -5,7 +5,7 @@ Projeto educacional de Engenharia de Dados: **API DataJud → HTTPX → PostgreS
 ## Entregas
 - Cliente assíncrono `httpx`, retries e timeout
 - Consulta exploratória de 10 documentos
-- Extração com filtro por códigos TPU, intervalo e paginação `search_after`
+- Extração ELT por classe TPU, retomável por checkpoint, com paginação `search_after` e conferência contra a API
 - Upsert idempotente dos documentos por `_id` do DataJud
 - Tabelas JSONB de origem no PostgreSQL
 - Transformações, agregados e testes de qualidade via dbt
@@ -34,29 +34,49 @@ dbt test --project-dir dbt --profiles-dir dbt
 ```
 Consulte `powerbi/POWER_BI_GUIA.md` para configurar o Power BI.
 
-## Ingestão real
-Classes validadas em amostra real do TJSP (TPU/CNJ):
+## Ingestão real (ELT)
+A extração filtra na fonte **apenas pela classe** (TPU/CNJ) e traz todos os anos. O recorte de período é feito no dbt.
 
-| Código | Classe | Documentos desde 2024-01-01 (consulta de out/2026) |
+| Código | Classe | Documentos no índice (out/2026) |
 |---|---|---|
-| 280 | Auto de Prisão em Flagrante | 33.603 |
-| 283 | Ação Penal - Procedimento Ordinário | 867.669 |
+| 280 | Auto de Prisão em Flagrante | 48.681 |
+| 283 | Ação Penal - Procedimento Ordinário | ~870 mil desde 2024 (não extraída) |
 
 ```bash
-python -m ingestion.run --class-codes 280 --start-date 2024-01-01 --end-date 2026-01-01
+python -m ingestion.run --class-codes 280
 ```
-A carga é feita **mês a mês**. Se a API falhar, rode o mesmo comando de novo: meses já carregados com sucesso são pulados (`--force` recarrega). O limite `--max-records` vale por mês.
+- **Retomável:** depois de cada lote, o cursor é salvo em `raw.ingestion_checkpoint`. Se a API cair, rode **o mesmo comando**: a carga continua de onde parou. `--restart` recomeça do zero.
+- **API instável:** para deixar rodando sozinho até o fim (macOS):
+  ```bash
+  caffeinate -i zsh -c 'until python -m ingestion.run --class-codes 280; do sleep 300; done'
+  ```
+- Em seguida, `dbt run` e `dbt test`.
 
-Em seguida, execute `dbt run` e `dbt test` novamente.
+### Conferência
+No fim, a carga compara o **total da classe informado pela API** (`size: 0`, `track_total_hits`) com os **documentos gravados por esta carga**. A conferência não usa nenhum critério além da classe, para não herdar um eventual erro da extração. Só com os números iguais o checkpoint vira `done`. Se divergir (`mismatch`), rodar de novo retoma do fim e confere outra vez. Divergências pequenas e persistentes costumam vir de processos que mudaram de classe durante a carga.
 
-Cada mês carregado fica registrado em `raw.ingestion_run` (parâmetros em JSON, quantidade, `success`/`failed` e, se houver, a mensagem na coluna `error`).
+Cada execução fica em `raw.ingestion_run` (`success`, `partial`, `failed` ou `mismatch`, com a mensagem na coluna `error`).
+
+## Achado: as datas do DataJud
+A carga real revelou um defeito na fonte oficial. `dataAjuizamento` chega em **dois formatos**, que convivem nos mesmos meses: ISO (`2024-12-10T10:00:00.000Z`) e compacto (`20250218171119`). O índice do DataJud **não entende o formato compacto** e lê o número como milissegundos desde 1970:
+
+| Texto enviado pelo TJSP | Data gravada no índice |
+|---|---|
+| `20250218171119` (18/02/2025 17:11) | `2611-09-15T12:36:11.119Z` |
+
+Consequências observadas antes da correção:
+- um filtro de período por mês **retornava 0 documentos** de fev a dez/2025, sem erro nenhum;
+- um limite com 14 dígitos virava o ano 2611, e a janela de dezembro trazia 38.441 documentos em vez de 355;
+- a conferência por mês "batia", porque contava com o mesmo filtro defeituoso que extraía. **Uma conferência que usa o critério da extração não detecta erro no critério.**
+
+Decisão: **nenhum filtro de data na fonte.** A extração usa só a classe, e o dbt interpreta a data a partir do texto original (`safe_timestamptz`). O teste `assert_datas_plausiveis` acusa qualquer data fora de 1990–hoje, e a `qa_cobertura` mostra quantos registros vieram em formato compacto.
 
 ## Decisões técnicas
-- **Paginação segura contra empates** (`ingestion/paginacao.py`): o `search_after` por `@timestamp` pula documentos quando vários têm o mesmo timestamp e a página termina no meio do grupo. A próxima página recomeça 1 ms antes do último timestamp e descarta `_id` já vistos. Se uma página inteira estiver empatada, a carga para com erro pedindo `--page-size` maior, em vez de perder dados em silêncio. Coberto por `tests/test_paginacao.py`.
-- **Resiliência a uma API instável**: o DataJud alterna 504 (servidor sobrecarregado) e 429 (limite de taxa). Tentar de novo em 1–2 s piorava o quadro e provocava o 429. O cliente espera 10, 20, 40, 80 e 120 s em erros 5xx, respeita o `Retry-After` no 429 e usa timeout de 120 s. Coberto por `tests/test_run.py`.
-- **Carga mensal retomável** (`ingestion/run.py`): consultas menores falham menos, e uma falha só obriga a refazer o mês em andamento.
+- **ELT em vez de filtro na fonte** (ver "Achado" acima). Coberto por `tests/test_client.py::test_nenhum_filtro_de_data_na_fonte`.
+- **Paginação segura contra empates** (`ingestion/paginacao.py`): o `search_after` por `@timestamp` pula documentos quando vários têm o mesmo timestamp e a página termina no meio do grupo. A próxima página recomeça 1 ms antes do último timestamp e descarta `_id` já vistos. A retomada pelo checkpoint usa a mesma regra. Se uma página inteira estiver empatada, a carga para com erro pedindo `--page-size` maior, em vez de perder dados em silêncio. Coberto por `tests/test_paginacao.py`.
+- **Resiliência a uma API instável**: o DataJud alterna 504 (servidor sobrecarregado), 429 (limite de taxa) e respostas 200 parciais (falha de shard). Tentar de novo em 1–2 s piorava o quadro e provocava o 429. O cliente espera 10, 20, 40, 80 e 120 s, respeita o `Retry-After` no 429, nunca aceita página parcial e usa timeout de 120 s. Coberto por `tests/test_run.py`.
 - **Datas tolerantes a formato** (`dbt/macros/safe_timestamptz.sql`): aceita ISO 8601 e o formato compacto `AAAAMMDDhhmmss`; valor inválido vira NULL em vez de derrubar todos os modelos. A data original é preservada em `data_ajuizamento_original`.
-- **Nada some sem registro**: `qa_cobertura` mostra o total da origem, quantos chegam ao `fct_processos` e quantos ficam de fora por data ausente/inválida, classe, órgão ou município ausentes.
+- **Nada some sem registro**: `qa_cobertura` mostra o total da origem, quantos chegam ao `fct_processos` e quantos ficam de fora, por motivo.
 
 ## Escopo / ciência de dados
 - Os agregados representam **somente os documentos efetivamente extraídos**, não o universo de processos criminais do TJSP.
