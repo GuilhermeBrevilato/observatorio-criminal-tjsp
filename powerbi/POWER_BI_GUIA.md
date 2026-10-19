@@ -43,7 +43,12 @@ servem só para conferência linha a linha.
 
 ### Página 1 · Visão geral
 - **Cartões:** `Flagrantes` · `Com desfecho` · `% identificável` · `Mediana horas`
-- **Gráfico de linhas:** eixo `rpt_desfecho_mensal[mes_ajuizamento]`, valor `flagrantes`
+- **Gráfico de linhas:** eixo `rpt_desfecho_mensal[mes_ajuizamento]`, valor `Flagrantes`, linha **não suavizada**
+  - Título: "Processos hoje na classe 280, por mês de entrada no TJSP"
+  - Linha X constante em **01/02/2025** (painel Análise), rótulo "mudança no envio dos dados"
+  - Aviso logo abaixo, obrigatório: "Não mede o volume de prisões no tempo: processos saem da classe 280
+    com o tempo, os meses recentes chegam incompletos e em fev/2025 mudou a forma de envio.
+    Ver a página Qualidade e o README."
 - **Filtros da página (os dois):** `rpt_desfecho_mensal[mes_ajuizamento]` **e**
   `fct_desfecho_flagrante[mes_ajuizamento]`, ambos a partir de **2024-01-01**.
   As tabelas não têm relacionamento: o filtro numa não chega à outra. Sem o segundo filtro,
@@ -79,7 +84,9 @@ servem só para conferência linha a linha.
 - **Caixa de texto:** os três achados, em uma linha cada:
   1. o DataJud indexa a data compacta como ano 2611: a extração não filtra data na fonte;
   2. a data compacta está em UTC: lida no horário de SP, 5% dos tempos ficavam negativos;
-  3. a decisão sobre a prisão só é identificável em 47% dos flagrantes.
+  3. a decisão sobre a prisão só é identificável em 47% dos flagrantes;
+  4. a série mensal mostra os processos que estão hoje na classe 280, não o volume de prisões no tempo
+     (quebra em fev/2025, meses recentes inflados e o último mês incompleto).
 
 ## 4. Rodapé (todas as páginas)
 `Fonte: CNJ / DataJud — TJSP, classe 280 (Auto de Prisão em Flagrante). Extração completa e
