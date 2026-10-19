@@ -16,6 +16,8 @@ models:
       +materialized: view
     quality:
       +materialized: view
+    reports:
+      +materialized: table
 seeds:
   observatorio_criminal:
     mapa_movimentos:

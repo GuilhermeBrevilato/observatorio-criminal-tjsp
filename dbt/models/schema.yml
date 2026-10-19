@@ -42,3 +42,12 @@ models:
     columns:
       - name: indicador
         data_tests: [not_null, unique]
+  - name: rpt_desfecho_mensal
+    description: "Por mês de ajuizamento: volume, desfechos e mediana de tempo. % de desfecho sobre identificáveis."
+    columns:
+      - name: mes_ajuizamento
+        data_tests: [unique]
+  - name: rpt_tempo_faixas
+    description: "Faixas de tempo da entrada no TJSP até a primeira decisão, por tipo de decisão."
+  - name: rpt_desfecho_orgao
+    description: "Por órgão julgador; use amostra_suficiente para filtrar percentuais instáveis."
