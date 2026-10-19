@@ -6,9 +6,9 @@ só medidas de soma e divisão. Os números são testados no dbt antes de chegar
 
 ## 1. Conectar (Power BI no Parallels, banco no Docker do Mac)
 1. No Mac: `docker compose up -d`, depois `dbt seed`, `dbt run` e `dbt test` **sem erro** (com erro, não atualize o painel).
-2. No Windows, descubra o endereço do Mac: `ipconfig | findstr "Gateway"` (padrão do Parallels: `10.211.55.1`).
+2. No Windows, confirme o endereço do Mac: `Test-NetConnection 10.211.55.2 -Port 5433` (deve dar `TcpTestSucceeded : True`; o Gateway do `ipconfig`, `10.211.55.1`, é o roteador do Parallels e não chega ao banco).
 3. Power BI → **Obter dados → Banco de dados PostgreSQL**
-   - Servidor: `10.211.55.1:5433` · Banco: `observatorio` · Modo: **Importar**
+   - Servidor: `10.211.55.2:5433` · Banco: `observatorio` · Modo: **Importar**
    - Credenciais (aba *Banco de dados*): `observatorio` / `observatorio`
 4. Importe do esquema `analytics`:
    `rpt_desfecho_mensal`, `rpt_tempo_faixas`, `rpt_desfecho_orgao`, `fct_desfecho_flagrante`, `qa_cobertura`, `qa_desfecho`.
