@@ -40,7 +40,7 @@ A extração filtra na fonte **apenas pela classe** (TPU/CNJ) e traz todos os an
 | Código | Classe | Documentos no índice (out/2026) |
 |---|---|---|
 | 280 | Auto de Prisão em Flagrante | 48.681 |
-| 283 | Ação Penal - Procedimento Ordinário | ~870 mil desde 2024 (não extraída) |
+| 283 | Ação Penal - Procedimento Ordinário | não medido de forma confiável (não extraída) |
 
 ```bash
 python -m ingestion.run --class-codes 280
@@ -54,6 +54,13 @@ python -m ingestion.run --class-codes 280
 
 ### Conferência
 No fim, a carga compara o **total da classe informado pela API** (`size: 0`, `track_total_hits`) com os **documentos gravados por esta carga**. A conferência não usa nenhum critério além da classe, para não herdar um eventual erro da extração. Só com os números iguais o checkpoint vira `done`. Se divergir (`mismatch`), rodar de novo retoma do fim e confere outra vez. Divergências pequenas e persistentes costumam vir de processos que mudaram de classe durante a carga.
+
+Se a divergência persistir em execuções seguidas, use `--restart`: em geral são processos que saíram da classe durante a carga.
+
+### Cópias velhas e fuso horário
+- **Cópias velhas:** um processo que sai da classe (ou do índice) não volta mais na extração, mas a cópia antiga continua no banco. O `stg_processos` marca como `vigente` só o que foi visto na **última carga completa e conferida** da classe; o `fct_processos` usa só os vigentes, e a `qa_cobertura` conta os demais em `fora_da_ultima_carga`.
+- **Fuso:** o mês de ajuizamento é calculado no horário de São Paulo, qualquer que seja o fuso do servidor (o Postgres do Docker roda em UTC).
+- **Dados de demonstração** (`demo_seed`) servem só para um banco vazio: misturados a uma carga real, entram nas contagens.
 
 Cada execução fica em `raw.ingestion_run` (`success`, `partial`, `failed` ou `mismatch`, com a mensagem na coluna `error`).
 
@@ -69,7 +76,9 @@ Consequências observadas antes da correção:
 - um limite com 14 dígitos virava o ano 2611, e a janela de dezembro trazia 38.441 documentos em vez de 355;
 - a conferência por mês "batia", porque contava com o mesmo filtro defeituoso que extraía. **Uma conferência que usa o critério da extração não detecta erro no critério.**
 
-Decisão: **nenhum filtro de data na fonte.** A extração usa só a classe, e o dbt interpreta a data a partir do texto original (`safe_timestamptz`). O teste `assert_datas_plausiveis` acusa qualquer data fora de 1990–hoje, e a `qa_cobertura` mostra quantos registros vieram em formato compacto.
+Números contaminados pelo defeito (não usar): uma contagem "desde 2024-01-01" com `range` simples dava 33.603 para a classe 280, porque todo documento em formato compacto, de qualquer ano, "está" em 26xx e passa no filtro. O total real de 2024–2025 é 10.661, e cerca de 72% vieram no formato compacto.
+
+Decisão: **nenhum filtro de data na fonte.** A extração usa só a classe, e o dbt interpreta a data a partir do texto original (`safe_timestamptz`). O teste `assert_datas_plausiveis` **falha** (bloqueia) com qualquer data fora de 1990–hoje, e a `qa_cobertura` mostra quantos registros vieram em formato compacto.
 
 ## Decisões técnicas
 - **ELT em vez de filtro na fonte** (ver "Achado" acima). Coberto por `tests/test_client.py::test_nenhum_filtro_de_data_na_fonte`.

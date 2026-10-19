@@ -1,5 +1,3 @@
-import json
-from datetime import datetime, timezone
 import psycopg
 from psycopg.types.json import Jsonb
 

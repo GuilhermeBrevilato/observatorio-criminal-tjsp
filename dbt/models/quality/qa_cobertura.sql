@@ -13,8 +13,9 @@ WITH base AS (
     count(*) FILTER (WHERE classe_codigo IS NULL)                   AS sem_classe,
     count(*) FILTER (WHERE municipio_ibge IS NULL)                  AS sem_municipio_ibge,
     count(*) FILTER (WHERE orgao_codigo IS NULL)                    AS sem_orgao,
+    count(*) FILTER (WHERE NOT vigente)                             AS fora_da_ultima_carga,
     count(*) FILTER (WHERE data_ajuizamento IS NOT NULL
-                       AND classe_codigo IS NOT NULL)               AS incluidos_fct
+                       AND classe_codigo IS NOT NULL AND vigente)   AS incluidos_fct
   FROM {{ ref('stg_processos') }}
 )
 SELECT indicador, quantidade,
@@ -27,6 +28,7 @@ CROSS JOIN LATERAL (VALUES
   ('data_invalida',      data_invalida),
   ('data_implausivel',   data_implausivel),
   ('data_formato_compacto', data_formato_compacto),
+  ('fora_da_ultima_carga', fora_da_ultima_carga),
   ('sem_classe',         sem_classe),
   ('sem_orgao',          sem_orgao),
   ('sem_municipio_ibge', sem_municipio_ibge)
