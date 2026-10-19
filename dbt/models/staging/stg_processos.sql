@@ -22,6 +22,7 @@ base AS (
     source #>> '{orgaoJulgador,nome}' AS orgao_nome,
     NULLIF(source #>> '{orgaoJulgador,codigoMunicipioIBGE}', '')::integer AS municipio_ibge,
     source->'assuntos' AS assuntos,
+    source->'movimentos' AS movimentos,
     ingested_at
   FROM raw.datajud_document
   WHERE tribunal = 'TJSP'

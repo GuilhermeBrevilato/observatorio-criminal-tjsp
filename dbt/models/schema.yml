@@ -23,3 +23,22 @@ models:
     columns:
       - name: indicador
         data_tests: [not_null, unique]
+  - name: fct_movimentos
+    description: "Um movimento por linha, com categoria (mapa_movimentos) e data validada."
+    columns:
+      - name: document_id
+        data_tests: [not_null]
+  - name: fct_desfecho_flagrante
+    description: "Um flagrante (classe 280) por linha, com a PRIMEIRA decisão sobre a prisão e o tempo até ela."
+    columns:
+      - name: document_id
+        data_tests: [not_null, unique]
+      - name: primeira_decisao
+        data_tests:
+          - accepted_values:
+              values: ['liberdade_provisoria', 'preventiva', 'relaxamento', 'nao_homologacao', 'domiciliar']
+  - name: qa_desfecho
+    description: "Cobertura do desfecho: quantos flagrantes têm a decisão identificável e por quê os demais não."
+    columns:
+      - name: indicador
+        data_tests: [not_null, unique]

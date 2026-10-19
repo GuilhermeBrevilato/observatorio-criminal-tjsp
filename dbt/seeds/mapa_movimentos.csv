@@ -1,0 +1,13 @@
+codigo,categoria,grupo,descricao
+818,liberdade_provisoria,decisao_prisao,Liberdade provisória
+12146,liberdade_provisoria,decisao_prisao,Liberdade Provisória (segundo código; diferença não identificável no DataJud)
+12140,preventiva,decisao_prisao,Prisão em Flagrante em Prisão Preventiva
+12141,relaxamento,decisao_prisao,Relaxamento do Flagrante
+146,nao_homologacao,decisao_prisao,Não-Homologação de prisão em flagrante
+12148,domiciliar,decisao_prisao,Prisão Domiciliar
+12733,anpp,acordo,Homologação do Acordo de Não Persecução Penal
+12738,transacao_penal,acordo,Homologação de Transação Penal
+12735,anpp_cumprido,acordo,Extinção de Punibilidade por cumprimento de ANPP
+12742,audiencia_custodia,evento,Audiência de custódia
+15032,manutencao_preventiva,evento,Manutenção da Prisão Preventiva
+12164,outras_decisoes,generico,Outras Decisões (genérico: não diz qual foi a decisão)

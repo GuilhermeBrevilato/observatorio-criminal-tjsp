@@ -80,11 +80,25 @@ Números contaminados pelo defeito (não usar): uma contagem "desde 2024-01-01" 
 
 Decisão: **nenhum filtro de data na fonte.** A extração usa só a classe, e o dbt interpreta a data a partir do texto original (`safe_timestamptz`). O teste `assert_datas_nao_futuras` **falha** (bloqueia) com qualquer data no futuro; `assert_datas_antigas` só avisa sobre datas anteriores a 1990 (a carga real trouxe 92 flagrantes de 1899 a 1989, lidos de forma consistente nos dois formatos), e a `qa_cobertura` mostra quantos registros vieram em formato compacto.
 
+## Desfecho do flagrante
+`fct_desfecho_flagrante`: uma linha por auto de prisão em flagrante, com a **primeira decisão sobre a prisão** (o que aconteceu logo depois do flagrante) e o tempo até ela.
+
+- **Códigos, não palavras:** cada movimento é classificado pelo código oficial (TPU/CNJ) em `dbt/seeds/mapa_movimentos.csv`, revisável num lugar só.
+- **Decisões consideradas:** liberdade provisória (818 e 12146), preventiva (12140), relaxamento (12141), não homologação (146) e domiciliar (12148). Também são marcados o acordo de não persecução penal (12733), seu cumprimento (12735), a transação penal (12738) e a audiência de custódia realizada (12742).
+- **Tempo:** `horas_ate_decisao` = da entrada do flagrante à primeira decisão. `horas_ate_decisao_valida` fica vazio quando a decisão aparece **antes** da entrada (registro inconsistente); use esta para médias.
+- **Ambiguidade:** duas decisões diferentes no mesmo instante são marcadas em `decisao_ambigua`.
+- **Datas inválidas** (`1899-12-30`, o "dia zero" de sistemas antigos; 17 movimentos na carga real) ficam fora dos cálculos.
+
+### Limite: o que o painel pode afirmar
+Na carga real (48.681 flagrantes), a decisão sobre a prisão é **identificável em 47%** (22.894). Nos demais, ela não está no DataJud ou está registrada como **"Outras Decisões" (12164)**, um código genérico, sem complemento, que não diz qual foi a decisão. Os complementos de "Liberdade provisória" também não distinguem os códigos 818 e 12146. Por isso, os números de desfecho valem **para os flagrantes com decisão identificável**, e o painel deve mostrar essa base (`qa_desfecho`).
+
+Achados de qualidade nos complementos: o mesmo campo aparece como `situacao_da_audiencia` e `situacao_de_audiencia`, e há valores no campo errado (ex.: o tipo "inicial" registrado como situação).
+
 ## Decisões técnicas
 - **ELT em vez de filtro na fonte** (ver "Achado" acima). Coberto por `tests/test_client.py::test_nenhum_filtro_de_data_na_fonte`.
 - **Paginação segura contra empates** (`ingestion/paginacao.py`): o `search_after` por `@timestamp` pula documentos quando vários têm o mesmo timestamp e a página termina no meio do grupo. A próxima página recomeça 1 ms antes do último timestamp e descarta `_id` já vistos. A retomada pelo checkpoint usa a mesma regra. Se uma página inteira estiver empatada, a carga para com erro pedindo `--page-size` maior, em vez de perder dados em silêncio. Coberto por `tests/test_paginacao.py`.
 - **Resiliência a uma API instável**: o DataJud alterna 504 (servidor sobrecarregado), 429 (limite de taxa) e respostas 200 parciais (falha de shard). Tentar de novo em 1–2 s piorava o quadro e provocava o 429. O cliente espera 10, 20, 40, 80 e 120 s, respeita o `Retry-After` no 429, nunca aceita página parcial e usa timeout de 120 s. Coberto por `tests/test_run.py`.
-- **Datas tolerantes a formato** (`dbt/macros/safe_timestamptz.sql`): aceita ISO 8601 e o formato compacto `AAAAMMDDhhmmss`; valor inválido vira NULL em vez de derrubar todos os modelos. A data original é preservada em `data_ajuizamento_original`.
+- **Datas tolerantes a formato** (`dbt/macros/safe_timestamptz.sql`): aceita ISO 8601 e o formato compacto `AAAAMMDDhhmmss`; valor inválido vira NULL em vez de derrubar todos os modelos. A data original é preservada em `data_ajuizamento_original`. O formato compacto é lido em **UTC**: lido no horário de São Paulo, 5% dos flagrantes nesse formato tinham a decisão "antes" da entrada, concentrados entre 0 e −3 h (contra 0,1% no formato ISO), a assinatura de um deslocamento de 3 horas.
 - **Nada some sem registro**: `qa_cobertura` mostra o total da origem, quantos chegam ao `fct_processos` e quantos ficam de fora, por motivo.
 
 ## Escopo / ciência de dados

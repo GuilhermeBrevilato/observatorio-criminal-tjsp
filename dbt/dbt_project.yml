@@ -5,6 +5,7 @@ profile: observatorio_criminal
 model-paths: ["models"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
+seed-paths: ["seeds"]
 on-run-start:
   - "{{ create_safe_timestamptz() }}"
 models:
@@ -15,3 +16,8 @@ models:
       +materialized: view
     quality:
       +materialized: view
+seeds:
+  observatorio_criminal:
+    mapa_movimentos:
+      +column_types:
+        codigo: integer
