@@ -9,3 +9,4 @@ data/*.json
 *.pyc
 .user.yml
 dbt/profiles.yml
+*.pbix
