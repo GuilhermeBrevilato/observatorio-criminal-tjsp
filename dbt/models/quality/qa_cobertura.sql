@@ -12,7 +12,10 @@ WITH base AS (
     count(*) FILTER (WHERE data_ajuizamento_original ~ '^\d{14}$')  AS data_formato_compacto,
     count(*) FILTER (WHERE classe_codigo IS NULL)                   AS sem_classe,
     count(*) FILTER (WHERE municipio_ibge IS NULL)                  AS sem_municipio_ibge,
-    count(*) FILTER (WHERE orgao_codigo IS NULL)                    AS sem_orgao,
+    -- O DataJud usa o código 0 (sem nome) quando o órgão não foi informado.
+    count(*) FILTER (WHERE orgao_codigo IS NULL OR orgao_codigo = 0)  AS sem_orgao,
+    count(*) FILTER (WHERE orgao_codigo <> 0
+                       AND coalesce(trim(orgao_nome), '') = '')     AS orgao_sem_nome,
     count(*) FILTER (WHERE NOT vigente)                             AS fora_da_ultima_carga,
     count(*) FILTER (WHERE data_ajuizamento IS NOT NULL
                        AND classe_codigo IS NOT NULL AND vigente)   AS incluidos_fct
@@ -32,5 +35,6 @@ CROSS JOIN LATERAL (VALUES
   ('fora_da_ultima_carga', fora_da_ultima_carga),
   ('sem_classe',         sem_classe),
   ('sem_orgao',          sem_orgao),
+  ('orgao_sem_nome',     orgao_sem_nome),
   ('sem_municipio_ibge', sem_municipio_ibge)
 ) AS t(indicador, quantidade)

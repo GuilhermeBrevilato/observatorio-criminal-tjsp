@@ -51,3 +51,9 @@ models:
     description: "Faixas de tempo da entrada no TJSP até a primeira decisão, por tipo de decisão."
   - name: rpt_desfecho_orgao
     description: "Por órgão julgador; use amostra_suficiente para filtrar percentuais instáveis."
+    columns:
+      - name: orgao_rotulo
+        description: "Nome + código: único mesmo quando o nome se repete entre órgãos."
+        tests:
+          - unique
+          - not_null
