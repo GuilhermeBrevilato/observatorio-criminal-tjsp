@@ -2,6 +2,14 @@
 
 Projeto educacional de Engenharia de Dados: **API DataJud → HTTPX → PostgreSQL → dbt → Power BI**.
 
+## Painel
+| | |
+|---|---|
+| ![Visão geral](docs/img/1_visao_geral.png) | ![Tempo até a decisão](docs/img/2_tempo.png) |
+| ![Órgão julgador](docs/img/3_orgao_julgador.png) | ![Qualidade dos dados](docs/img/4_qualidade_dos_dados.png) |
+
+Quatro páginas no Power BI: visão geral, tempo até a decisão, órgão julgador e qualidade dos dados. As imagens mostram só números agregados. O `.pbix` não é versionado, porque guarda os dados importados.
+
 ## Entregas
 - Cliente assíncrono `httpx`, retries e timeout
 - Consulta exploratória de 10 documentos
