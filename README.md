@@ -1,6 +1,16 @@
 # Observatório de Inteligência Processual Criminal — TJSP
 
-Projeto educacional de Engenharia de Dados: **API DataJud → HTTPX → PostgreSQL → dbt → Power BI**.
+![testes](https://github.com/GuilhermeBrevilato/observatorio-criminal-tjsp/actions/workflows/ci.yml/badge.svg)
+
+Projeto de portfólio de Engenharia de Dados: **API DataJud (CNJ) → Python/httpx → PostgreSQL → dbt → Power BI**,
+aplicado aos autos de prisão em flagrante (classe TPU 280) do TJSP.
+
+## Em resumo
+- **Extração completa e conferida:** 48.681 documentos da classe 280; a API informou 48.681 e o banco gravou 48.681.
+- **A fonte tem defeitos, e eles foram tratados:** parte das datas é indexada como o ano 2611 (um filtro de data na API devolve só uma fração dos dados, sem erro); a data compacta está em UTC; o órgão julgador vem sem código ou com nomes repetidos. Cada achado virou uma regra no pipeline e um teste.
+- **O que os dados permitem afirmar:** a decisão sobre a prisão é identificável em 47% dos flagrantes. Nesses, a primeira decisão foi liberdade provisória em 73,7%, preventiva em 23,2% e relaxamento ou não homologação em 3,1%; a mediana é de 13,9 h da entrada no TJSP à decisão, e 95,1% saem em menos de 24 h.
+- **O que não permitem:** a série mensal mostra os processos que estão hoje na classe 280, não o volume de prisões no tempo; e o tempo conta da entrada no tribunal, não da prisão.
+- **Testes:** 16 testes unitários e 23 testes de dados no dbt (os bloqueantes impedem a atualização do painel). Rodam a cada push no GitHub Actions com dados sintéticos; o resultado na carga real está em [`docs/evidencia_testes.md`](docs/evidencia_testes.md).
 
 ## Painel
 | | |
@@ -8,41 +18,58 @@ Projeto educacional de Engenharia de Dados: **API DataJud → HTTPX → PostgreS
 | ![Visão geral](docs/img/1_visao_geral.png) | ![Tempo até a decisão](docs/img/2_tempo.png) |
 | ![Órgão julgador](docs/img/3_orgao_julgador.png) | ![Qualidade dos dados](docs/img/4_qualidade_dos_dados.png) |
 
-Quatro páginas no Power BI: visão geral, tempo até a decisão, órgão julgador e qualidade dos dados. As imagens mostram só números agregados. O `.pbix` não é versionado, porque guarda os dados importados.
+Quatro páginas no Power BI: visão geral, tempo até a decisão, órgãos julgadores e qualidade dos dados. As imagens mostram só números agregados. O `.pbix` não é versionado, porque guarda os dados importados; [`powerbi/POWER_BI_GUIA.md`](powerbi/POWER_BI_GUIA.md) descreve como remontá-lo.
+
+## Arquitetura
+```
+API pública DataJud (CNJ)
+   │  ingestion/  httpx · filtro só por classe · paginação search_after segura contra empates
+   │              retries (504, 429, shard parcial) · checkpoint retomável · conferência com o total da API
+   ▼
+PostgreSQL  raw.datajud_document (JSON bruto, upsert por _id) · raw.ingestion_run · raw.ingestion_checkpoint
+   │
+   ▼  dbt/
+staging   stg_processos ........ datas nos dois formatos (UTC), cópias vigentes
+marts     fct_processos · fct_movimentos · fct_desfecho_flagrante (primeira decisão sobre a prisão)
+reports   rpt_desfecho_mensal · rpt_tempo_faixas · rpt_desfecho_orgao (rótulo único por código)
+quality   qa_cobertura · qa_desfecho ......... o que entra, o que fica de fora e por quê
+tests     bloqueiam: datas futuras, soma mensal, partição do desfecho, chaves, rótulo de órgão
+          avisam:    datas antes de 1990, decisão antes da entrada
+   │
+   ▼
+Power BI  4 páginas, só leitura das tabelas prontas (nenhum cálculo de negócio no painel)
+```
 
 ## Entregas
 - Cliente assíncrono `httpx`, retries e timeout
-- Consulta exploratória de 10 documentos
 - Extração ELT por classe TPU, retomável por checkpoint, com paginação `search_after` e conferência contra a API
 - Upsert idempotente dos documentos por `_id` do DataJud
 - Tabelas JSONB de origem no PostgreSQL
 - Transformações, agregados e testes de qualidade via dbt
-- Gerador de dados **inteiramente sintéticos** para demonstração
+- Gerador de dados **inteiramente sintéticos** que reproduz os casos da carga real
+- Testes unitários (pytest) e integração contínua (GitHub Actions)
 - Guia de conexão, medidas e páginas no Power BI
-- Testes unitários com pytest
 
-## Execução rápida (Mac/Linux)
+## Rodar sem a API (dados sintéticos)
+Reproduz todo o pipeline em poucos minutos, sem chave da API e sem dados reais:
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-# Preencha DATAJUD_API_KEY usando a documentação oficial do CNJ.
-python -m pytest -q
-python -m ingestion.explore_datajud
-```
-
-## Banco de dados e demo sem API
-```bash
-docker compose up -d
-python -m ingestion.demo_seed
+python -m pytest -q                                  # 16 testes unitários
+docker compose up -d                                 # PostgreSQL na porta 5433
+python -m ingestion.demo_seed                        # 300 flagrantes fictícios (+30 de outras classes)
 cp dbt/profiles.yml.example dbt/profiles.yml
-dbt run --project-dir dbt --profiles-dir dbt
-dbt test --project-dir dbt --profiles-dir dbt
+dbt seed --project-dir dbt --profiles-dir dbt
+dbt run  --project-dir dbt --profiles-dir dbt
+dbt test --project-dir dbt --profiles-dir dbt        # PASS=23 nos sintéticos
 ```
-Consulte `powerbi/POWER_BI_GUIA.md` para configurar o Power BI.
+Os flagrantes sintéticos têm `_id` começando com `DEMO_` e órgãos "fictícios", e cobrem as situações que a carga real revelou: datas nos dois formatos, as 4 situações do desfecho, órgão não informado e dois órgãos com o mesmo nome. Para ver o painel, conecte o Power BI a esse banco seguindo o guia; os números serão os sintéticos.
+
+**Não misture:** dados sintéticos e carga real no mesmo banco entram juntos nas contagens. Use um banco limpo para cada um.
 
 ## Ingestão real (ELT)
+Requer a chave pública da API em `.env` (`cp .env.example .env` e preencha `DATAJUD_API_KEY` conforme a [documentação do CNJ](https://datajud-wiki.cnj.jus.br/api-publica/acesso/)).
+
 A extração filtra na fonte **apenas pela classe** (TPU/CNJ) e traz todos os anos. O recorte de período é feito no dbt.
 
 | Código | Classe | Documentos no índice (out/2026) |
@@ -68,7 +95,6 @@ Se a divergência persistir em execuções seguidas, use `--restart`: em geral s
 ### Cópias velhas e fuso horário
 - **Cópias velhas:** um processo que sai da classe (ou do índice) não volta mais na extração, mas a cópia antiga continua no banco. O `stg_processos` marca como `vigente` só o que foi visto na **última carga completa e conferida** da classe; o `fct_processos` usa só os vigentes, e a `qa_cobertura` conta os demais em `fora_da_ultima_carga`.
 - **Fuso:** o mês de ajuizamento é calculado no horário de São Paulo, qualquer que seja o fuso do servidor (o Postgres do Docker roda em UTC).
-- **Dados de demonstração** (`demo_seed`) servem só para um banco vazio: misturados a uma carga real, entram nas contagens.
 
 Cada execução fica em `raw.ingestion_run` (`success`, `partial`, `failed` ou `mismatch`, com a mensagem na coluna `error`).
 
@@ -156,7 +182,7 @@ Decisão: `rpt_desfecho_orgao` tem **uma linha por código**; `orgao_rotulo` = n
 - `numeroProcesso` não é uma chave única universal de documento no DataJud. A chave de carga é `_id` e a camada analítica conta documentos.
 - Para indicadores de abrangência geral é preciso estratégia de extração e reconciliação completa, avaliação de cobertura e deduplicação juridicamente validada.
 - `dataAjuizamento` é data declarada no registro e não data de ocorrência do crime.
-- Dados sintéticos usam códigos `999001/999002`; **não são códigos TPU criminais reais**.
+- Dados sintéticos (`demo_seed`) são fictícios: `_id` com prefixo `DEMO_`, órgãos "fictícios" e, fora da classe 280, os códigos `999001/999002`, que **não são códigos TPU reais**.
 - Nenhum dado real é distribuído neste repositório; não publique arquivos extraídos antes de revisar permissões legais e riscos de reidentificação.
 
 ## Fontes oficiais

@@ -29,4 +29,5 @@ def test_invalid_page_size():
 
 def test_synthetic_ids_unique():
     hits = demo_hits()
-    assert len({h["_id"] for h in hits}) == 30
+    assert len({h["_id"] for h in hits}) == len(hits)
+    assert all(h["_id"].startswith("DEMO_") for h in hits)  # nada que pareça dado real

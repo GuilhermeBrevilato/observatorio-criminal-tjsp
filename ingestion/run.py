@@ -24,7 +24,7 @@ from ingestion.storage import (close_checkpoint, count_loaded_since, finish_run,
                                init_db, open_checkpoint, save_cursor, start_run, store_hits)
 
 logger = logging.getLogger(__name__)
-DEFAULT_DB = "postgresql://observatorio:observatorio@localhost:5432/observatorio"
+DEFAULT_DB = "postgresql://observatorio:observatorio@localhost:5433/observatorio"
 MODO = "elt-classe-completa-v1"
 
 

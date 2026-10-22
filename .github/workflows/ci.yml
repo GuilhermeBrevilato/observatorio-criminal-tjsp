@@ -1,0 +1,46 @@
+# Roda a cada push e pull request, SEM dados reais e SEM a API do DataJud:
+#   1. testes unitários (pytest): cliente, paginação e retomada;
+#   2. pipeline completo em dados sintéticos: Postgres -> demo_seed -> dbt seed/run/test.
+# Os testes bloqueantes do dbt (datas futuras, soma mensal, partição do desfecho,
+# rótulo único de órgão, chaves) precisam passar para o job ficar verde.
+name: testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: observatorio
+          POSTGRES_PASSWORD: observatorio
+          POSTGRES_DB: observatorio
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U observatorio"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://observatorio:observatorio@localhost:5433/observatorio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Dependências
+        run: pip install -r requirements.txt
+      - name: Testes unitários (pytest)
+        run: python -m pytest -q
+      - name: Dados sintéticos
+        run: python -m ingestion.demo_seed
+      - name: dbt seed, run e test
+        run: |
+          cp dbt/profiles.yml.example dbt/profiles.yml
+          dbt seed --project-dir dbt --profiles-dir dbt
+          dbt run  --project-dir dbt --profiles-dir dbt
+          dbt test --project-dir dbt --profiles-dir dbt
