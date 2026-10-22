@@ -115,7 +115,25 @@ O gráfico de flagrantes por mês funciona e os números estão certos: são os 
 ### Limite: o que o painel pode afirmar
 Na carga real (48.681 flagrantes), a decisão sobre a prisão é **identificável em 47%** (22.899). Nos demais, ela não está no DataJud ou está registrada como **"Outras Decisões" (12164)**, um código genérico, sem complemento, que não diz qual foi a decisão. Os complementos de "Liberdade provisória" também não distinguem os códigos 818 e 12146. Por isso, os números de desfecho valem **para os flagrantes com decisão identificável**, e o painel deve mostrar essa base (`qa_desfecho`).
 
+Os 48.681 flagrantes se dividem em quatro grupos que não se sobrepõem (`qa_desfecho`; o teste `assert_qa_desfecho_particao` bloqueia se a soma não fechar):
+
+| Grupo | Flagrantes | % |
+|---|---|---|
+| Decisão sobre a prisão identificável | 22.899 | 47,0 |
+| Só "Outras Decisões" (12164) | 16.806 | 34,5 |
+| Com movimentos, sem decisão sobre a prisão | 8.035 | 16,5 |
+| Nenhum movimento | 941 | 1,9 |
+
 Achados de qualidade nos complementos: o mesmo campo aparece como `situacao_da_audiencia` e `situacao_de_audiencia`, e há valores no campo errado (ex.: o tipo "inicial" registrado como situação).
+
+## Achado: o órgão julgador
+Ao montar a página por órgão, três problemas apareceram no campo `orgaoJulgador`:
+
+1. **Órgão não informado:** 3.154 flagrantes vêm com código 0 e sem nome. Num ranking, essa linha seria o "maior órgão" do TJSP.
+2. **Mesmo nome, órgãos diferentes:** "VARA REGIONAL DAS GARANTIAS" é o nome de 4 órgãos (códigos diferentes). Agrupado pelo nome, o Power BI juntaria os quatro e **somaria os percentuais** (14,7 + 35,1 + 23,1 = 72,9% de preventiva, um número que não existe).
+3. **Mesmo órgão, nomes diferentes:** códigos com duas grafias ("MOGI MIRIM" e "MOJI MIRIM") ou com nome antigo e novo ("01 CUMULATIVA DE COSMOPOLIS" e "VARA UNICA DE COSMOPOLIS").
+
+Decisão: `rpt_desfecho_orgao` tem **uma linha por código**; `orgao_rotulo` = nome mais frequente do código + código, coberto por teste de unicidade; o código 0 vira "Órgão não informado", fica fora do ranking e é contado em `qa_cobertura` (`sem_orgao`). Resultado: 968 órgãos com flagrantes; 197 com ao menos 30 decisões identificáveis, que concentram 29.827 flagrantes (61,3%).
 
 ## Decisões técnicas
 - **ELT em vez de filtro na fonte** (ver "Achado" acima). Coberto por `tests/test_client.py::test_nenhum_filtro_de_data_na_fonte`.
